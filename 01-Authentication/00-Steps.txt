@@ -24,6 +24,39 @@ This is done as follows:
 - Signing the CSR (creating a cert) of 30 days by the CA: 
   openssl x509 -req -in alice.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out alice.crt -days 30
  - Creating a user on the cluster with the certificate: kubectl config set-credentials alice --client-certificate=alice.crt --client-key=alice.key
+ - We should set the user's context (Bind the user to a namespace): kubectl config set-context alice --cluster=kubernetes --namespace=production --user=alice
+ - Now we should create a role to define what the user is allowed to do (in kubernetes we have Roles and ClusterRoles, Roles are namespace wide while clusterRoles are Cluster wide): kubectl create -f prod-role.yaml
+ - Then apply  a rolebind to this role (define the users who are going to be given the roles): prod-rbind.yaml
+ 
+ - For verification: kubectl describe -n=production role
+ 
+ - Now we need to create a custom kube conf file for Alice: The file should be as follows;
+ rbac.authorization.k8s.io
+ ---
+ apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJek1ERXdNakl4TVRrek5Gb1hEVE15TVRJek1ESXhNVGt6TkZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTVJSCmkvU3dTL1NYWUk2SUcyMHUyRTlWMm5STHM4TUJmSHFHbGFpQ004NmZpUjN1eGpXV1IzME1mcWtUQngyd2xwU1AKcUZGRUIyMGJMTmZwSjZuVGpSd2E0Y2RrZXVTeHlaUmNqOXJuZjZYQklZRldLZVU1YUNRS0I4ZHRGQU00MzlQMAphNFdpWEtRd29OUjJacW8xZUVsZENlamtud2pJYTY3OXArTnZtTDVLNmNwOUxhNGJHQ0J5bmtHMTJkQVZDWGJZCndSbzZjZ09YbVdwUkY2U2NZVlZBb25BODdmWkhFRXhhVDgwUzc5RDl5RVpPODBNazcrVkR5VG1UME1mUzNCTlEKOHo0dE41Z2hreTRGeUNGcXBQS3JmYmpWVUllRzQ4elUzazJjK1pOVkRmSzkwejk0Z3I3T0dhWlJIQjAxVGp4cQo2d1FsSEk3ZDQ2MUkxMkhjbU5VQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZHL1UxKzY1NUZTTSthQ1JJTmp3MmwxQklrRlhNQlVHQTFVZEVRUU8KTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBSW9raVpPWnQ1dWovN2pRTWthTgpTMkhMWjkwK3lrWHVSZEV0d0ZKcW1Gd3FOWTFoaEJFbGxWUVNGdnc5aXAzV2h1VDNrcy9ickhxajRzQnM2R1ErCk5QalFldkp4MkNLb1hZT2lmVThqdDVBOE9YdUIvbnMwVGJBTkRIbjZzcy9IZC9WaVp3SHhRRWdselVOSFJja3gKWVNhclVYUEVIK0ptcFNKU3ZDc1YydjFQUzh5MDA2SndzeEsrRHZFazVXV1lhaVlnVmdLQ0FMNHdiUFhvd1U0OQpSNTkzMWJlc0UwVnNVZE1zcHB3RzVrQlE3Z1NsUFZYZzloWkFlYnV0N1JSSW5aQ3RFN0l2OVRNMHpEakIzOWIzCmZkYnRsUVYyb1czd1MzWWhCSWxiRkRraVNmSDcyZzNNZGphY0phMjh2eDRtSzVONEcyam90b0N3UENPNFZwdjcKRGNZPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+    server: https://10.1.1.15:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    namespace: production
+    user: alice
+  name: alice
+current-context: alice
+kind: Config
+preferences: {}
+users:
+- name: alice
+  user:
+    client-certificate: ~/.certs/alice.crt
+    client-key: ~/.certs/alice.key
+
+ - After creating the file we send it to Alice via scp : scp config alice@10.1.1.209: 
+ This file should be copied in /home/alice/.kube/
+
   
 ------ For Bob--------
 - User's private key generation : openssl genrsa -out bob.key 4096
@@ -31,4 +64,13 @@ This is done as follows:
 - Once this is done, Alice sends the CSR and the private key to the Master node for signing: 
   scp bob.csr brice@10.1.1.15:
   scp bob.key brice@10.1.1.15:
-- Signing the CSR (creating a cert) of 30 days by the CA: openssl x509 -req -in bob.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out bob.crt -days 30
+- Signing the CSR (creating a cert) of 30 days by the CA: 
+ openssl x509 -req -in bob.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out bob.crt -days 30
+ - Creating a user on the cluster with the certificate: kubectl config set-credentials alice --client-certificate=alice.crt --client-key=alice.key
+ - We should set the user's context (Bind the user to a namespace): kubectl config set-credentials bob --client-certificate=bob.crt --client-key=bob.key --user=bob
+ - Now we should create a role to define what the user is allowed to do (in kubernetes we have Roles and ClusterRoles, Roles are namespace wide while clusterRoles are Cluster wide): kubectl create -f dev-role.yaml
+ - Then apply  a rolebind to this role (define the users who are going to be given the roles): dev07-rbind.yaml
+ 
+ - For verification: kubectl describe -n=production role
+ 
+ - Now we need to create a custom kube conf file for bob: The file should be as follows;
