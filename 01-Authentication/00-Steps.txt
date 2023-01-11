@@ -1,1 +1,34 @@
+I created 3 standard users to apply RBAC (Role Base Access Control)
+Alice - will have permission in the Production NameSpace only
+Bob - Will have permission in the Development NameSpace only
+kube-admin - will have permision in the production, development and monitoring Namespaces
 
+sudo adduser alice 
+sudo adduser bob 
+sudo adduser kube-admin
+
+Namespace Creation on Cluster: kubectl create -f rp1-namespaces.yaml
+
+On the Master node , i copy the /etc/kubernetes/admin.conf file to the kube-admin account: scp /etc/kubernetes/admin.conf kube-admin@10.1.1.209: 
+On the kube-admin account i copy admin.conf file to ~/.kube/ as config : cp ~/admin.conf ~/.kube/config
+Now the kube-admin user can fully access to the kubernetes cluster and execute commands using kubectl
+
+For Alice and Bob to access the cluster with the required priviledges, they need certificates signed by the CA with their names as CN of those certificates
+This is done as follows:
+------ For Alice-----
+- User's private key generation : openssl genrsa -out alice.key 4096
+- Extracting CSR from key: openssl req -new -key alice.key -out alice.csr -subj "/CN=Alice/O=Production"
+- Once this is done, Alice sends the CSR and the private key to the Master node for signing: 
+  scp alice.csr brice@10.1.1.15:
+  scp alice.key brice@10.1.1.15:
+- Signing the CSR (creating a cert) of 30 days by the CA: 
+  openssl x509 -req -in alice.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out alice.crt -days 30
+ - Creating a user on the cluster with the certificate: kubectl config set-credentials alice --client-certificate=alice.crt --client-key=alice.key
+  
+------ For Bob--------
+- User's private key generation : openssl genrsa -out bob.key 4096
+- Extracting CSR from key: openssl req -new -key bob.key -out bob.csr -subj "/CN=Bob/O=Development"
+- Once this is done, Alice sends the CSR and the private key to the Master node for signing: 
+  scp bob.csr brice@10.1.1.15:
+  scp bob.key brice@10.1.1.15:
+- Signing the CSR (creating a cert) of 30 days by the CA: openssl x509 -req -in bob.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out bob.crt -days 30
