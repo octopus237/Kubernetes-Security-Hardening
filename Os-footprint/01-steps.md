@@ -1,6 +1,6 @@
 ## Best Practices
 - Don't use the Host namespace only if necessary
----yaml
+```yaml!
 spec:
   hostIPC: false
   hostNetwork: false
